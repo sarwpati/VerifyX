@@ -1,0 +1,18 @@
+{
+  "name": "verifyx-project",
+  "version": "1.0.0",
+  "description": "VerifyX - Secure Digital Certificate Issuance and Verification Platform",
+  "scripts": {
+    "install-all": "npm --prefix server install && npm --prefix client install",
+    "server": "npm --prefix server run dev",
+    "client": "npm --prefix client run dev",
+    "start": "concurrently \"npm --prefix server run dev\" \"npm --prefix client run dev\"",
+    "seed": "npm --prefix server run seed"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  },
+  "keywords": ["certificate-verification", "pki", "ed25519", "merkle-tree", "mern", "security"],
+  "author": "VerifyX Team",
+  "license": "MIT"
+}
