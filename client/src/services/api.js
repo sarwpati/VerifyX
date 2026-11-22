@@ -1,7 +1,12 @@
 import axios from 'axios';
 
+// Use VITE_API_URL if defined in environment (e.g. Render/Vercel production), otherwise default to local '/api'
+const baseURL = import.meta.env.VITE_API_URL 
+  ? `${import.meta.env.VITE_API_URL.replace(/\/+$/, '')}/api`
+  : '/api';
+
 const api = axios.create({
-  baseURL: '/api',
+  baseURL,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -23,14 +28,6 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response && error.response.status === 401) {
-      // If token expired or invalid, clear local auth
-      const currentPath = window.location.pathname;
-      if (!currentPath.startsWith('/verify') && !currentPath.startsWith('/login') && !currentPath.startsWith('/wallet')) {
-        // localStorage.removeItem('verifyx_token');
-        // localStorage.removeItem('verifyx_user');
-      }
-    }
     return Promise.reject(error);
   }
 );
