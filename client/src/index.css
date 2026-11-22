@@ -4,30 +4,30 @@
 
 @layer base {
   body {
-    @apply bg-[#050914] text-slate-100 font-sans antialiased selection:bg-emerald-500 selection:text-white;
+    @apply bg-[#0b1120] text-slate-200 font-sans antialiased selection:bg-emerald-500 selection:text-white;
   }
 }
 
-/* Glassmorphic Cards & Panels */
+/* Glassmorphic Cards & Panels - Clean, Lighter & Airy */
 .glass-panel {
-  background: rgba(13, 20, 38, 0.7);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(22, 33, 56, 0.75);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.09);
 }
 
 .glass-panel-subtle {
-  background: rgba(18, 27, 49, 0.45);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(26, 38, 64, 0.5);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.07);
 }
 
 .glass-panel-glow {
-  background: rgba(13, 20, 38, 0.85);
-  backdrop-filter: blur(20px);
-  border: 1px solid rgba(16, 185, 129, 0.3);
-  box-shadow: 0 0 35px -5px rgba(16, 185, 129, 0.15);
+  background: rgba(22, 33, 56, 0.85);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  box-shadow: 0 4px 25px -4px rgba(16, 185, 129, 0.12);
 }
 
 /* Guilloche Pattern for Certificate Visuals */
@@ -39,11 +39,11 @@
 
 /* Glowing text */
 .text-glow-emerald {
-  text-shadow: 0 0 20px rgba(16, 185, 129, 0.4);
+  text-shadow: 0 0 16px rgba(16, 185, 129, 0.35);
 }
 
 .text-glow-gold {
-  text-shadow: 0 0 20px rgba(245, 158, 11, 0.4);
+  text-shadow: 0 0 16px rgba(245, 158, 11, 0.35);
 }
 
 /* Custom Scrollbars */
@@ -53,14 +53,14 @@
 }
 
 ::-webkit-scrollbar-track {
-  background: #070d1e;
+  background: #0f172a;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #1e293b;
+  background: #334155;
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #334155;
+  background: #475569;
 }

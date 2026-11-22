@@ -22,10 +22,11 @@ export default {
           950: '#052e16',
         },
         navy: {
-          800: '#0b1329',
-          850: '#080e1e',
-          900: '#050a14',
-          950: '#03060c'
+          700: '#1e293b',
+          800: '#131e36',
+          850: '#0f172a',
+          900: '#0b1120',
+          950: '#090d19'
         }
       },
       fontFamily: {
@@ -34,10 +35,10 @@ export default {
         serif: ['Cinzel', 'Merriweather', 'serif']
       },
       boxShadow: {
-        'glow-emerald': '0 0 25px -5px rgba(16, 185, 129, 0.3)',
-        'glow-blue': '0 0 25px -5px rgba(59, 130, 246, 0.3)',
-        'glow-rose': '0 0 25px -5px rgba(244, 63, 94, 0.3)',
-        'glass': '0 8px 32px 0 rgba(0, 0, 0, 0.37)'
+        'glow-emerald': '0 0 20px -3px rgba(16, 185, 129, 0.25)',
+        'glow-blue': '0 0 20px -3px rgba(59, 130, 246, 0.25)',
+        'glow-rose': '0 0 20px -3px rgba(244, 63, 94, 0.25)',
+        'glass': '0 8px 30px 0 rgba(0, 0, 0, 0.25)'
       },
       animation: {
         'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',

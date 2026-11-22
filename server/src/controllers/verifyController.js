@@ -4,6 +4,8 @@ const { verifySignature } = require('../crypto/pkiEngine');
 const { hashObject, hashBufferOrString } = require('../crypto/hasher');
 const { verifyMerkleProof } = require('../crypto/merkleEngine');
 const { logSecurityEvent } = require('../services/auditService');
+const { PDFDocument } = require('pdf-lib');
+const { PDFParse } = require('pdf-parse');
 
 /**
  * Public Online Verification by Certificate ID
@@ -32,7 +34,9 @@ exports.verifyOnline = async (req, res) => {
       return res.status(404).json({
         success: false,
         verificationStatus: 'NOT_FOUND',
-        message: 'No certificate found with this ID. The credential may be counterfeit or unregistered.',
+        tamperVerdict: 'ORG_NOT_LISTED',
+        reasonCode: 'ORGANIZATION_NOT_LISTED',
+        message: 'Your certificate organization is not listed on VerifyX. We need some time to contact your organization and let you know if your certificate is valid or not.',
       });
     }
 
@@ -45,7 +49,6 @@ exports.verifyOnline = async (req, res) => {
     let publicKey = cert.crypto.publicKeyUsed;
     if (org && org.pki && org.pki.publicKey) {
       publicKey = org.pki.publicKey;
-      // If rotated, check history
       if (org.pki.keyId !== cert.issuer.keyId && org.pki.keyHistory) {
         const historical = org.pki.keyHistory.find((k) => k.keyId === cert.issuer.keyId);
         if (historical) publicKey = historical.publicKey;
@@ -98,55 +101,71 @@ exports.verifyOnline = async (req, res) => {
     cert.lastVerifiedAt = new Date();
     await cert.save();
 
-    if (org) {
-      org.stats.verifiedCount += 1;
-      await org.save();
-    }
-
-    // Record Audit Log
     await logSecurityEvent({
-      action: isTampered ? 'TAMPER_ATTEMPT_DETECTED' : 'CERTIFICATE_VERIFIED_ONLINE',
+      action: 'CERTIFICATE_VERIFIED_ONLINE',
       certificateId: cert.certificateId,
       orgId: cert.issuer.orgId,
       ipAddress: req.ip || '127.0.0.1',
       userAgent: req.headers['user-agent'] || 'Browser',
-      status: isTampered ? 'SECURITY_ALERT' : (overallStatus === 'VALID' ? 'SUCCESS' : 'WARNING'),
+      status: overallStatus === 'VALID' ? 'SUCCESS' : 'WARNING',
       details: {
         verificationStatus: overallStatus,
-        isSignatureValid,
         isDataHashValid,
+        isSignatureValid,
         isMerkleValid,
-        tamperDetails,
       },
     });
 
-    res.json({
+    return res.json({
       success: true,
       verificationStatus: overallStatus,
       isAuthentic: overallStatus === 'VALID',
-      certificate: cert,
-      cryptographicProof: {
-        algorithm: 'Ed25519 (Edwards-curve Digital Signature)',
-        hashAlgorithm: 'SHA-256 (FIPS 180-4)',
-        canonicalizationStandard: 'RFC 8785 (JSON Canonicalization Scheme)',
-        isSignatureValid,
-        isDataHashValid,
-        isMerkleValid,
-        keyId: cert.issuer.keyId,
-        computedDataHash,
-        storedDataHash: cert.crypto.dataHash,
-        signatureSample: cert.crypto.signature.substring(0, 32) + '...',
-        merkleRoot: cert.crypto.merkle?.root || null,
-        isBatchIssued: !!cert.crypto.merkle?.isBatch,
+      certificate: {
+        certificateId: cert.certificateId,
+        recipient: cert.recipient,
+        issuer: cert.issuer,
+        details: cert.details,
+        crypto: {
+          algorithm: cert.crypto.algorithm,
+          keyId: cert.crypto.keyId,
+          dataHash: cert.crypto.dataHash,
+          signature: cert.crypto.signature,
+          pdfHash: cert.crypto.pdfHash,
+          merkle: cert.crypto.merkle,
+        },
+        pdfUrl: cert.pdfUrl,
+        qrCodeDataUrl: cert.qrCodeDataUrl,
+        verificationUrl: cert.verificationUrl,
+        status: cert.status,
+        revocationDetails: cert.revocationDetails,
+        verificationCount: cert.verificationCount,
+        lastVerifiedAt: cert.lastVerifiedAt,
       },
-      issuerOrganization: org ? {
-        name: org.name,
-        code: org.code,
-        status: org.status,
-        website: org.website,
-        logoUrl: org.logoUrl,
-      } : null,
-      revocationDetails: cert.revocationDetails,
+      cryptographicProof: {
+        algorithm: 'Ed25519',
+        canonicalizer: 'RFC 8785 (JCS)',
+        hashFunction: 'SHA-256',
+        isDataHashValid,
+        isSignatureValid,
+        isMerkleValid,
+        computedDataHash,
+        publicKeyUsed: publicKey,
+        keyId: cert.issuer.keyId,
+      },
+      issuerOrganization: org
+        ? {
+            id: org._id,
+            name: org.name,
+            code: org.code,
+            domain: org.domain,
+            verified: org.verificationStatus === 'verified',
+            publicKey: org.pki?.publicKey,
+            keyId: org.pki?.keyId,
+          }
+        : null,
+      tamperVerdict: isTampered ? 'TAMPER_DETECTED' : 'UNALTERED_ORIGINAL',
+      tamperDetails,
+      revocationDetails: cert.status === 'revoked' ? cert.revocationDetails : null,
       verifiedAt: new Date().toISOString(),
     });
   } catch (err) {
@@ -156,7 +175,7 @@ exports.verifyOnline = async (req, res) => {
 };
 
 /**
- * Public PDF Drag-and-Drop Tamper Inspector
+ * Public PDF Upload & Tamper / Scanner Inspector
  */
 exports.verifyPdfFile = async (req, res) => {
   try {
@@ -167,11 +186,10 @@ exports.verifyPdfFile = async (req, res) => {
     const fileBuffer = req.file.buffer;
     const uploadedPdfHash = hashBufferOrString(fileBuffer);
 
-    // 1. Direct match: Exact PDF hash match
+    // 1. Direct match: Exact PDF hash match in DB
     const exactMatchCert = await Certificate.findOne({ 'crypto.pdfHash': uploadedPdfHash });
 
     if (exactMatchCert) {
-      // PDF is 100% authentic byte-for-byte
       exactMatchCert.verificationCount += 1;
       exactMatchCert.lastVerifiedAt = new Date();
       await exactMatchCert.save();
@@ -193,21 +211,74 @@ exports.verifyPdfFile = async (req, res) => {
         message: 'The uploaded PDF matches the official issuer cryptographic hash byte-for-byte. No alterations detected.',
         uploadedPdfHash,
         certificate: exactMatchCert,
+        hasScanner: true,
         isTampered: false,
       });
     }
 
-    // 2. Search if certificate ID exists in filename or embedded metadata
-    let possibleCertId = null;
-    const filenameMatch = req.file.originalname.match(/VX-[A-Z0-9]+-\d{4}-\d+/i);
-    if (filenameMatch) {
-      possibleCertId = filenameMatch[0].toUpperCase();
+    // 2. Parse PDF metadata and visual/text contents
+    let extractedText = '';
+    let pdfMetadata = {};
+    let extractedCertId = null;
+    let extractedOrgName = null;
+
+    try {
+      const uint8 = new Uint8Array(fileBuffer);
+      const parser = new PDFParse(uint8);
+      const parsedData = await parser.getText();
+      extractedText = parsedData?.text || '';
+    } catch (parseErr) {
+      console.warn('[Verify Controller] PDF text parsing warning:', parseErr.message);
     }
 
-    if (possibleCertId) {
-      const dbCert = await Certificate.findOne({ certificateId: possibleCertId });
+    try {
+      const pdfDoc = await PDFDocument.load(fileBuffer, { ignoreEncryption: true });
+      pdfMetadata = {
+        title: pdfDoc.getTitle(),
+        author: pdfDoc.getAuthor(),
+        subject: pdfDoc.getSubject(),
+        keywords: pdfDoc.getKeywords(),
+        producer: pdfDoc.getProducer(),
+      };
+      if (pdfMetadata.author) {
+        extractedOrgName = pdfMetadata.author;
+      }
+    } catch (metaErr) {
+      console.warn('[Verify Controller] PDF metadata read warning:', metaErr.message);
+    }
+
+    // Try finding Certificate ID (VX-ORG-YYYY-XXXX pattern or similar)
+    const combinedSearchStr = `${req.file.originalname} ${extractedText} ${pdfMetadata.title || ''} ${pdfMetadata.keywords || ''}`;
+    const idPattern = /VX-[A-Z0-9]+-\d{4}-\d+/i;
+    const match = combinedSearchStr.match(idPattern);
+    if (match) {
+      extractedCertId = match[0].toUpperCase();
+    }
+
+    // 3. Scanner / QR Check:
+    // Does the PDF mention scan/scanner, or contain a verification URL / QR scanner marker?
+    const hasScannerWords = /(scan|scanner|qr\s*code|scan\s*to\s*verify|verifyx|\/verify\/)/i.test(extractedText);
+    const hasScannerMeta = pdfMetadata.keywords && /Tamper-Evident|VerifyX/i.test(pdfMetadata.keywords);
+    const hasScanner = hasScannerWords || !!hasScannerMeta;
+
+    // If PDF definitely lacks any scanner / QR code marker:
+    if (!hasScanner && !extractedCertId) {
+      return res.status(422).json({
+        success: false,
+        verificationStatus: 'NO_SCANNER',
+        tamperVerdict: 'MISSING_SCANNER',
+        reasonCode: 'SCANNER_NOT_FOUND',
+        hasScanner: false,
+        message: 'Certificate does not contain a scanner/QR code to verify. Please upload a scanner-consistent certificate.',
+        uploadedPdfHash,
+      });
+    }
+
+    // 4. If Certificate ID is identified, check database for tamper or validity
+    if (extractedCertId) {
+      const dbCert = await Certificate.findOne({ certificateId: extractedCertId });
       if (dbCert) {
-        // Tamper Detected! The certificate ID belongs to a real credential, but the PDF content hash does NOT match the generated original!
+        // Real Certificate ID, but PDF byte hash didn't match -> Tamper Alert!
         await logSecurityEvent({
           action: 'TAMPER_ATTEMPT_DETECTED',
           certificateId: dbCert.certificateId,
@@ -217,7 +288,7 @@ exports.verifyPdfFile = async (req, res) => {
           status: 'SECURITY_ALERT',
           details: {
             result: 'TAMPERED_PDF_FILE',
-            expectedHash: dbCert.crypto.pdfHash,
+            expectedHash: dbCert.crypto?.pdfHash,
             actualHash: uploadedPdfHash,
             filename: req.file.originalname,
           },
@@ -227,28 +298,56 @@ exports.verifyPdfFile = async (req, res) => {
           success: false,
           verificationStatus: 'TAMPERED',
           tamperVerdict: 'TAMPER_DETECTED',
+          reasonCode: 'HASH_MISMATCH',
+          hasScanner: true,
           message: 'SECURITY ALERT: The uploaded document has been modified after issuance. The cryptographic SHA-256 byte-hash does not match the official record.',
           certificate: dbCert,
           isTampered: true,
           tamperDetails: {
-            expectedPdfHash: dbCert.crypto.pdfHash,
-            uploadedPdfHash: uploadedPdfHash,
+            expectedPdfHash: dbCert.crypto?.pdfHash,
+            uploadedPdfHash,
             identifiedCertificateId: dbCert.certificateId,
-            recipientName: dbCert.recipient.name,
+            recipientName: dbCert.recipient?.name,
             reason: 'Binary stream or visual contents of the PDF were altered post-signing.',
           },
         });
       }
     }
 
-    // 3. Document is unrecognized / not generated on VerifyX
+    // 5. If we could not verify whether it is valid or not:
+    // Determine relevant reasons (e.g. Organization not listed, unindexed certificate)
+    let orgNameDetected = extractedOrgName;
+    if (!orgNameDetected) {
+      const orgLines = extractedText.split('\n').map((l) => l.trim()).filter(Boolean);
+      if (orgLines.length > 0) {
+        orgNameDetected = orgLines[0].substring(0, 50);
+      }
+    }
+
+    // Check if the organization name matches any registered organization in VerifyX
+    let isOrgListed = false;
+    if (orgNameDetected) {
+      const matchedOrg = await Organization.findOne({
+        $or: [
+          { name: new RegExp(orgNameDetected, 'i') },
+          { code: new RegExp(orgNameDetected, 'i') }
+        ]
+      });
+      if (matchedOrg) isOrgListed = true;
+    }
+
     return res.status(404).json({
       success: false,
-      verificationStatus: 'UNRECOGNIZED',
-      tamperVerdict: 'UNREGISTERED_OR_COUNTERFEIT',
-      message: 'This document could not be matched with any registered cryptographic record on the VerifyX network.',
+      verificationStatus: 'UNABLE_TO_VERIFY',
+      tamperVerdict: 'ORGANIZATION_NOT_LISTED',
+      reasonCode: 'ORG_NOT_REGISTERED',
+      hasScanner: hasScanner,
+      detectedOrg: orgNameDetected || 'Unknown Organization',
+      detectedCertId: extractedCertId || null,
+      message: 'Your certificate organization is not listed on VerifyX. We need some time to contact your organization and let you know if your certificate is valid or not.',
       uploadedPdfHash,
     });
+
   } catch (err) {
     console.error('[Verify Controller] PDF verify error:', err);
     res.status(500).json({ success: false, message: err.message });
