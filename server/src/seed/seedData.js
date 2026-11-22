@@ -24,11 +24,14 @@ async function seedDatabase() {
     AuditLog.deleteMany({}),
   ]);
 
-  // 1. Create Organizations & PKI Keypairs
+  // 1. Create 5 Diverse Organizations & PKI Keypairs
   const iiitbhKeys = generateOrgKeyPair();
-  const gcaKeys = generateOrgKeyPair();
   const snowKeys = generateOrgKeyPair();
+  const gcaKeys = generateOrgKeyPair();
+  const awsKeys = generateOrgKeyPair();
+  const stanfordKeys = generateOrgKeyPair();
 
+  // Org 1: IIIT Bhagalpur
   const iiitbhOrg = await Organization.create({
     name: 'Indian Institute of Information Technology Bhagalpur',
     code: 'IIITBH',
@@ -46,9 +49,31 @@ async function seedDatabase() {
       signatoryName: 'Prof. D. K. Singh',
       signatoryTitle: 'Dean of Academic Affairs & Registrar',
     },
-    stats: { issuedCount: 5, verifiedCount: 14, revokedCount: 1 },
+    stats: { issuedCount: 6, verifiedCount: 18, revokedCount: 1 },
   });
 
+  // Org 2: ServiceNow
+  const snowOrg = await Organization.create({
+    name: 'ServiceNow, Inc.',
+    code: 'SNOW',
+    email: 'certifications@servicenow.com',
+    website: 'https://nowlearning.servicenow.com',
+    description: 'Global cloud platform leader delivering digital enterprise workflow credentials.',
+    status: 'verified',
+    pki: {
+      publicKey: snowKeys.publicKey,
+      privateKeyEncrypted: snowKeys.privateKey,
+      keyId: snowKeys.keyId,
+      algorithm: 'Ed25519',
+    },
+    signerInfo: {
+      signatoryName: 'Jayney Howson',
+      signatoryTitle: 'Senior Vice President, Global Learning & Development',
+    },
+    stats: { issuedCount: 2, verifiedCount: 12, revokedCount: 0 },
+  });
+
+  // Org 3: Google Cloud Academy
   const gcaOrg = await Organization.create({
     name: 'Google Cloud Academy',
     code: 'GCA',
@@ -66,30 +91,52 @@ async function seedDatabase() {
       signatoryName: 'Sarah Jenkins',
       signatoryTitle: 'Global Certification Director',
     },
-    stats: { issuedCount: 2, verifiedCount: 8, revokedCount: 0 },
+    stats: { issuedCount: 3, verifiedCount: 15, revokedCount: 0 },
   });
 
-  const snowOrg = await Organization.create({
-    name: 'ServiceNow, Inc.',
-    code: 'SNOW',
-    email: 'certifications@servicenow.com',
-    website: 'https://nowlearning.servicenow.com',
-    description: 'Global cloud platform leader delivering digital workflow certifications.',
+  // Org 4: AWS Training & Certification
+  const awsOrg = await Organization.create({
+    name: 'Amazon Web Services (AWS)',
+    code: 'AWS',
+    email: 'training@amazon.com',
+    website: 'https://aws.amazon.com/certification',
+    description: 'Global cloud computing platform training & validated role-based certifications.',
     status: 'verified',
     pki: {
-      publicKey: snowKeys.publicKey,
-      privateKeyEncrypted: snowKeys.privateKey,
-      keyId: snowKeys.keyId,
+      publicKey: awsKeys.publicKey,
+      privateKeyEncrypted: awsKeys.privateKey,
+      keyId: awsKeys.keyId,
       algorithm: 'Ed25519',
     },
     signerInfo: {
-      signatoryName: 'Jayney Howson',
-      signatoryTitle: 'Senior Vice President, Global Learning and Development ServiceNow',
+      signatoryName: 'Kevin Kelly',
+      signatoryTitle: 'Director of AWS Global Cloud Education',
     },
-    stats: { issuedCount: 1, verifiedCount: 5, revokedCount: 0 },
+    stats: { issuedCount: 2, verifiedCount: 9, revokedCount: 0 },
   });
 
-  // 2. Create Users
+  // Org 5: Stanford Online
+  const stanfordOrg = await Organization.create({
+    name: 'Stanford Center for Professional Development',
+    code: 'STANFORD',
+    email: 'scpd-support@stanford.edu',
+    website: 'https://online.stanford.edu',
+    description: 'Executive education and advanced computing engineering credentials from Stanford School of Engineering.',
+    status: 'verified',
+    pki: {
+      publicKey: stanfordKeys.publicKey,
+      privateKeyEncrypted: stanfordKeys.privateKey,
+      keyId: stanfordKeys.keyId,
+      algorithm: 'Ed25519',
+    },
+    signerInfo: {
+      signatoryName: 'Prof. John Hennessy',
+      signatoryTitle: 'Academic Director of Engineering Initiatives',
+    },
+    stats: { issuedCount: 2, verifiedCount: 7, revokedCount: 0 },
+  });
+
+  // 2. Create Users for Demo Roles
   const adminUser = await User.create({
     name: 'VerifyX Security Administrator',
     email: 'admin@verifyx.io',
@@ -97,77 +144,75 @@ async function seedDatabase() {
     role: 'admin',
   });
 
-  const orgUser1 = await User.create({
-    name: 'IIITBH Examination Cell',
+  const orgUserIIITBH = await User.create({
+    name: 'IIITBH Exam Cell',
     email: 'registrar@iiitbh.ac.in',
     password: 'Password123!',
     role: 'org',
-    orgId: iiitbhOrg._id,
+    organizationId: iiitbhOrg._id,
   });
 
-  const orgUser2 = await User.create({
-    name: 'Google Cloud Certifications',
-    email: 'credentials@googlecloud.academy',
-    password: 'Password123!',
-    role: 'org',
-    orgId: gcaOrg._id,
-  });
-
-  const orgUser3 = await User.create({
-    name: 'ServiceNow Credential Authority',
+  const orgUserSNOW = await User.create({
+    name: 'ServiceNow Exam Authority',
     email: 'certifications@servicenow.com',
     password: 'Password123!',
     role: 'org',
-    orgId: snowOrg._id,
+    organizationId: snowOrg._id,
   });
 
+  const orgUserGCA = await User.create({
+    name: 'Google Cloud Credentials',
+    email: 'credentials@googlecloud.academy',
+    password: 'Password123!',
+    role: 'org',
+    organizationId: gcaOrg._id,
+  });
+
+  const orgUserAWS = await User.create({
+    name: 'AWS Credentials Authority',
+    email: 'training@amazon.com',
+    password: 'Password123!',
+    role: 'org',
+    organizationId: awsOrg._id,
+  });
+
+  const orgUserSTANFORD = await User.create({
+    name: 'Stanford Online Registrar',
+    email: 'scpd-support@stanford.edu',
+    password: 'Password123!',
+    role: 'org',
+    organizationId: stanfordOrg._id,
+  });
+
+  // Students
   const studentSarwpati = await User.create({
     name: 'Sarwpati Kumar',
     email: 'sarwpati.kumar@iiitbh.ac.in',
     password: 'Password123!',
     role: 'student',
-    studentProfile: {
-      rollNumber: '220101099',
-      institution: 'Indian Institute of Information Technology Bhagalpur',
-      degree: 'B.Tech Computer Science & Engineering',
-    },
+    rollNumber: '220101099',
+    department: 'Cloud Platform & Workflow Automation',
   });
 
-  const student1 = await User.create({
+  const studentAarav = await User.create({
     name: 'Aarav Sharma',
     email: 'aarav.sharma@iiitbh.ac.in',
     password: 'Password123!',
     role: 'student',
-    studentProfile: {
-      rollNumber: '220101001',
-      institution: 'Indian Institute of Information Technology Bhagalpur',
-      degree: 'B.Tech Computer Science & Engineering',
-    },
+    rollNumber: '220101001',
+    department: 'Computer Science & Engineering',
   });
 
-  const student2 = await User.create({
-    name: 'Priya Singh',
-    email: 'priya.singh@iiitbh.ac.in',
-    password: 'Password123!',
-    role: 'student',
-    studentProfile: {
-      rollNumber: '220101045',
-      institution: 'Indian Institute of Information Technology Bhagalpur',
-      degree: 'B.Tech Data Science & AI',
-    },
-  });
-
-  // 3. Create Templates
   const defaultTemplate = await Template.create({
-    name: 'IIITBH Official Degree Gold & Emerald',
+    name: 'Official Degree & Excellence Diploma',
     orgId: iiitbhOrg._id,
+    type: 'degree',
     isDefault: true,
     layout: {
-      theme: 'modern-emerald',
-      primaryColor: '#047857',
-      accentColor: '#d97706',
-      borderStyle: 'ornate-guilloche',
-      watermarkText: 'IIIT BHAGALPUR VERIFIED',
+      orientation: 'landscape',
+      borderStyle: 'double-gold',
+      primaryColor: '#065F46',
+      accentColor: '#D97706',
     },
     signatories: [
       { name: 'Prof. D. K. Singh', title: 'Dean of Academic Affairs' },
@@ -247,7 +292,7 @@ async function seedDatabase() {
       revocationDetails: revocation ? {
         isRevoked: true,
         revokedAt: new Date(revocation.date || Date.now()),
-        revokedBy: orgUser1._id,
+        revokedBy: orgUserIIITBH._id,
         reason: revocation.reason,
         revocationHash: hashBufferOrString(`${certId}:${revocation.reason}`),
       } : { isRevoked: false },
@@ -255,14 +300,16 @@ async function seedDatabase() {
       pdfUrl: pdfResult.relativeUrl,
       qrCodeDataUrl,
       verificationUrl,
-      verificationCount: Math.floor(Math.random() * 12) + 2,
+      verificationCount: Math.floor(Math.random() * 10) + 3,
     });
 
     return cert;
   }
 
-  // 4. Seed Individual Certificates
-  // Cert 0: Sarwpati Kumar's ServiceNow CSA Certificate (VALID)
+  // 4. Create Diverse Certificates Across Institutions
+  console.log('[Seed] Generating individual institution demo certificates...');
+
+  // CERT 1: ServiceNow CSA (Sarwpati Kumar) - VALID
   await createDemoCert({
     certId: 'VX-SNOW-2026-7842',
     recipient: {
@@ -278,7 +325,7 @@ async function seedDatabase() {
     issueDate: '2026-06-24',
   });
 
-  // Cert 1: Aarav's IIITBH Degree (VALID)
+  // CERT 2: IIIT Bhagalpur B.Tech CSE Degree (Aarav Sharma) - VALID
   await createDemoCert({
     certId: 'VX-IIITBH-2026-1001',
     recipient: {
@@ -294,24 +341,57 @@ async function seedDatabase() {
     issueDate: '2026-05-20',
   });
 
-  // Cert 2: Aarav's Google Cloud Certification (VALID)
+  // CERT 3: AWS Solutions Architect (Sarwpati Kumar) - VALID
   await createDemoCert({
-    certId: 'VX-GCA-2026-2002',
+    certId: 'VX-AWS-2026-4401',
+    recipient: {
+      name: 'Sarwpati Kumar',
+      email: 'sarwpati.kumar@iiitbh.ac.in',
+      rollNumber: '220101099',
+      department: 'Cloud Solutions Architecture',
+    },
+    org: awsOrg,
+    title: 'AWS Certified Solutions Architect – Professional',
+    courseName: 'Advanced Multi-Tier Cloud Architecture & Resiliency',
+    grade: 'Certified Professional (Score: 940/1000)',
+    issueDate: '2026-04-18',
+    expiryDate: '2029-04-18',
+  });
+
+  // CERT 4: Stanford Online Artificial Intelligence (Aarav Sharma) - VALID
+  await createDemoCert({
+    certId: 'VX-STAN-2026-5502',
     recipient: {
       name: 'Aarav Sharma',
       email: 'aarav.sharma@iiitbh.ac.in',
       rollNumber: '220101001',
-      department: 'Cloud Infrastructure Specialization',
+      department: 'Artificial Intelligence & Neural Networks',
     },
-    org: gcaOrg,
-    title: 'Google Cloud Certified Professional Cloud Architect',
-    courseName: 'Enterprise Cloud Architecture & Distributed Systems',
-    grade: 'Pass with Honors (Score: 98/100)',
-    issueDate: '2026-03-10',
-    expiryDate: '2029-03-10',
+    org: stanfordOrg,
+    title: 'Stanford Graduate Certificate in Artificial Intelligence',
+    courseName: 'Deep Learning, Transformers & Scalable Reinforcement Systems',
+    grade: 'Grade A+ (Distinguished Scholar)',
+    issueDate: '2026-03-22',
   });
 
-  // Cert 3: Revoked Malpractice Certificate (REVOKED)
+  // CERT 5: Google Cloud Architect (Sarwpati Kumar) - VALID
+  await createDemoCert({
+    certId: 'VX-GCA-2026-2002',
+    recipient: {
+      name: 'Sarwpati Kumar',
+      email: 'sarwpati.kumar@iiitbh.ac.in',
+      rollNumber: '220101099',
+      department: 'Cloud Architecture & Security',
+    },
+    org: gcaOrg,
+    title: 'Google Cloud Certified Professional Cloud Security Engineer',
+    courseName: 'Zero-Trust Architecture & IAM Identity Governance',
+    grade: 'Passed with Honors',
+    issueDate: '2026-02-14',
+    expiryDate: '2028-02-14',
+  });
+
+  // CERT 6: Revoked Malpractice Certificate (REVOKED with detailed disciplinary cause)
   await createDemoCert({
     certId: 'VX-IIITBH-2026-9999',
     recipient: {
@@ -327,11 +407,11 @@ async function seedDatabase() {
     status: 'revoked',
     revocation: {
       date: '2026-07-01',
-      reason: 'Academic Integrity Violation: Fraudulent laboratory transcript submission detected during audit.',
+      reason: 'Academic Integrity Disciplinary Action: Submitting falsified laboratory data and fraudulent semester marks in 8th-semester major project submission.',
     },
   });
 
-  // Cert 4: Expired Certificate (EXPIRED)
+  // CERT 7: Expired Cloud Certification (EXPIRED with expiration term notice)
   await createDemoCert({
     certId: 'VX-GCA-2024-8888',
     recipient: {
@@ -459,60 +539,39 @@ async function seedDatabase() {
     },
     {
       action: 'CERTIFICATE_ISSUED',
-      certificateId: 'VX-IIITBH-2026-1001',
-      orgId: iiitbhOrg._id,
-      userId: orgUser1._id,
+      certificateId: 'VX-SNOW-2026-7842',
+      orgId: snowOrg._id,
+      userId: orgUserSNOW._id,
       ipAddress: '172.16.20.5',
       userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
       status: 'SUCCESS',
-      details: { recipient: 'Aarav Sharma', title: 'B.Tech CSE', keyId: iiitbhOrg.pki.keyId },
+      details: { recipient: 'Sarwpati Kumar', title: 'ServiceNow CSA', keyId: snowOrg.pki.keyId },
     },
     {
-      action: 'BATCH_CERTIFICATES_ISSUED',
-      orgId: iiitbhOrg._id,
-      userId: orgUser1._id,
-      ipAddress: '172.16.20.5',
+      action: 'CERTIFICATE_ISSUED',
+      certificateId: 'VX-AWS-2026-4401',
+      orgId: awsOrg._id,
+      userId: orgUserAWS._id,
+      ipAddress: '172.16.20.10',
       userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
       status: 'SUCCESS',
-      details: { batchId, count: 3, merkleRoot: batchMerkleRoot },
+      details: { recipient: 'Sarwpati Kumar', title: 'AWS Solutions Architect', keyId: awsOrg.pki.keyId },
     },
     {
       action: 'CERTIFICATE_REVOKED',
       certificateId: 'VX-IIITBH-2026-9999',
       orgId: iiitbhOrg._id,
-      userId: orgUser1._id,
+      userId: orgUserIIITBH._id,
       ipAddress: '172.16.20.5',
       userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
       status: 'WARNING',
       details: { reason: 'Academic Integrity Violation' },
     },
-    {
-      action: 'CERTIFICATE_VERIFIED_ONLINE',
-      certificateId: 'VX-IIITBH-2026-1001',
-      orgId: iiitbhOrg._id,
-      ipAddress: '192.0.2.45',
-      userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)',
-      status: 'SUCCESS',
-      details: { verificationStatus: 'VALID', isSignatureValid: true },
-    },
-    {
-      action: 'TAMPER_ATTEMPT_DETECTED',
-      certificateId: 'VX-IIITBH-2026-1001',
-      orgId: iiitbhOrg._id,
-      ipAddress: '203.0.113.88',
-      userAgent: 'PostmanRuntime/7.32.3',
-      status: 'SECURITY_ALERT',
-      details: {
-        result: 'TAMPERED_PDF_FILE',
-        reason: 'Binary stream or visual contents of the PDF were altered post-signing.',
-      },
-    },
   ]);
 
-  console.log('[Seed] VerifyX Database successfully seeded with full PKI demo assets!');
+  console.log('[Seed] VerifyX Database successfully seeded with 5 institutions & 10 demo credentials!');
 }
 
-// Allow running standalone or as imported function
 if (require.main === module) {
   const { connectDB, disconnectDB } = require('../config/db');
   require('dotenv').config();
